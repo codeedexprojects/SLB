@@ -229,7 +229,6 @@ class AdminLoginView(APIView):
             login(request, user)
             return Response({"detail": "Login successful"}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
 
 class ProjectListView(generics.ListCreateAPIView):
     queryset = Project.objects.all()

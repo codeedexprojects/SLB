@@ -143,25 +143,28 @@ class AverageCompletionPercentageSerializer(serializers.Serializer):
     average_completion_percentage = serializers.FloatField()
 
 class AdminLoginSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-    password = serializers.CharField(write_only=True)
+    email = serializers.EmailField(label=("Email"), write_only=True)
+    password = serializers.CharField(label=("Password"), style={'input_type': 'password'}, write_only=True)
 
-    def validate(self, data):
-        email = data.get('email')
-        password = data.get('password')
+    def validate(self, attrs):
+        email = attrs.get('email')
+        password = attrs.get('password')
 
         if email and password:
-            user = authenticate(username=email, password=password)
-            if user:
-                if not user.is_superuser:
-                    raise serializers.ValidationError("User does not have admin privileges.")
-                data['user'] = user
-            else:
-                raise serializers.ValidationError("Unable to log in with provided credentials.")
-        else:
-            raise serializers.ValidationError("Must include 'email' and 'password'.")
+            try:
+                user = User.objects.get(email=email)
+            except User.DoesNotExist:
+                raise serializers.ValidationError(("Invalid email or password."), code='authorization')
 
-        return data
+            user = authenticate(username=user.username, password=password)
+
+            if user is None:
+                raise serializers.ValidationError(("Invalid email or password."), code='authorization')
+        else:
+            raise serializers.ValidationError(("Must include 'email' and 'password'."), code='authorization')
+
+        attrs['user'] = user
+        return attrs
 
 class ProjectSerializer(serializers.ModelSerializer):
     class Meta:
