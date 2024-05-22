@@ -222,14 +222,18 @@ class EmployeeMainTrainingAverageView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class AdminLoginView(APIView):
+    authentication_classes = []
+    permission_classes = []
     def post(self, request, *args, **kwargs):
         serializer = AdminLoginSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.validated_data['user']
             login(request, user)
-            return Response({"detail": "Login successful"}, status=status.HTTP_200_OK)
+            return Response({
+                "detail": "Login successful",
+                "id": user.id
+            }, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
 
 class ProjectListView(generics.ListCreateAPIView):
     queryset = Project.objects.all()
