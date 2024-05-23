@@ -71,25 +71,27 @@ class SubTrainingSerializer(serializers.ModelSerializer):
         return representation
     
 class SubTrainingUpdateSerializer(serializers.ModelSerializer):
-    validity_periods = serializers.SerializerMethodField()
+    subtraining_id = serializers.IntegerField(source='id')
+    main_training = serializers.PrimaryKeyRelatedField(queryset=MainTraining.objects.all())
+    validity_period = serializers.SerializerMethodField()
 
     class Meta:
         model = SubTraining
-        fields = ['id', 'name',  'validity_periods', 'main_training']  # Add other fields as needed
+        fields = ['main_training', 'subtraining_id', 'name', 'validity_period']
 
-    def get_validity_periods(self, obj):
+    def get_validity_period(self, obj):
         if obj.validity_period:
-            total_seconds = obj.validity_period.total_seconds()
-            days = total_seconds // 86400  # Convert seconds to days
-            if days >= 365:
-                years = days // 365
-                return f"{years} year{'s' if years > 1 else ''}"
-            elif days >= 30:
-                months = days // 30
-                return f"{months} month{'s' if months > 1 else ''}"
-            else:
-                return f"{int(days)} day{'s' if days > 1 else ''}"
-        return None
+            years = obj.validity_period.days // 365
+            if years > 1:
+                return f"{years} years"
+            elif years == 1:
+                return "1 year"
+            months = (obj.validity_period.days % 365) // 30
+            if months > 1:
+                return f"{months} months"
+            elif months == 1:
+                return "1 month"
+        return "No validity period"
 
 class MainTrainingSerializer(serializers.ModelSerializer):
     # sub_trainings = SubTrainingSerializer(many=True, read_only=True)
@@ -276,8 +278,8 @@ class MainTrainingWithSubSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'sub_trainings']
 
     def get_sub_trainings(self, obj):
-        sub_trainings = SubTraining.objects.all()
-        return SubTrainingSerializer(sub_trainings, many=True).data
+        sub_trainings = SubTraining.objects.filter(main_training=obj)
+        return SubTrainingUpdateSerializer(sub_trainings, many=True).data
 
 class EmployeeSearchSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(source='company.name', read_only=True)
