@@ -8,7 +8,7 @@ from .models import Company, Employee,MainTraining, SubTraining,EmployeeSubTrain
 from .serializers import CompanySerializer, EmployeeSerializer, EmployeePhotoSerializer,MainTrainingCreateUpdateSerializer,MainTrainingSerializer,SubTrainingSerializer\
 ,EmployeeSubTrainingSerializer,AdminLoginSerializer,ProjectsSerializer,AcceptRejectEmployeeSerializer,OnDutyOffDutyToggleSerializer,EmployeePercentageSubTrainingSerializer\
 ,MainTrainingsSerializer,SubTrainingWithMainNameSerializer,MainTrainingWithSubSerializer,EmployeeSearchSerializer,EmployeeMainTrainingSerializer,NotificationSerializer\
-,AverageCompletionPercentageSerializer,AveragePercentageSerializer
+,AverageCompletionPercentageSerializer,AveragePercentageSerializer,SubTrainingUpdateSerializer
 from rest_framework.views import APIView
 from django.contrib.auth import login
 from .filters import EmployeeFilter
@@ -85,8 +85,10 @@ class SubTrainingListCreateView(generics.ListCreateAPIView):
     serializer_class = SubTrainingSerializer
 
 class SubTrainingRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    authentication_classes = []
+    permission_classes = []
     queryset = SubTraining.objects.all()
-    serializer_class = SubTrainingSerializer
+    serializer_class = SubTrainingUpdateSerializer
 
 
 class EmployeeSubTrainingListCreateView(generics.ListCreateAPIView):
