@@ -8,11 +8,14 @@ from .models import Company, Employee,MainTraining, SubTraining,EmployeeSubTrain
 from .serializers import CompanySerializer, EmployeeSerializer, EmployeePhotoSerializer,MainTrainingCreateUpdateSerializer,MainTrainingSerializer,SubTrainingSerializer\
 ,EmployeeSubTrainingSerializer,AdminLoginSerializer,ProjectsSerializer,AcceptRejectEmployeeSerializer,OnDutyOffDutyToggleSerializer,EmployeePercentageSubTrainingSerializer\
 ,MainTrainingsSerializer,SubTrainingWithMainNameSerializer,MainTrainingWithSubSerializer,EmployeeSearchSerializer,EmployeeMainTrainingSerializer,NotificationSerializer\
-,AverageCompletionPercentageSerializer,AveragePercentageSerializer,SubTrainingUpdateSerializer
+,AverageCompletionPercentageSerializer,AveragePercentageSerializer,SubTrainingUpdateSerializer,URLSerializer
 from rest_framework.views import APIView
 from django.contrib.auth import login
 from .filters import EmployeeFilter
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.parsers import MultiPartParser, FormParser
+from django.urls import get_resolver
+
 
 # Company Views
 class CompanyListCreateView(generics.ListCreateAPIView):
@@ -76,6 +79,8 @@ class MainTrainingListCreateView(generics.ListCreateAPIView):
     serializer_class = MainTrainingCreateUpdateSerializer
 
 class MainTrainingRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    authentication_classes = []
+    permission_classes = []
     queryset = MainTraining.objects.all()
     serializer_class = MainTrainingCreateUpdateSerializer
 
@@ -90,12 +95,16 @@ class SubTrainingRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView
     queryset = SubTraining.objects.all()
     serializer_class = SubTrainingUpdateSerializer
 
-
 class EmployeeSubTrainingListCreateView(generics.ListCreateAPIView):
+    authentication_classes = []
+    permission_classes = []
     queryset = EmployeeSubTraining.objects.all()
     serializer_class = EmployeeSubTrainingSerializer
 
+
 class EmployeeSubTrainingDeleteView(generics.DestroyAPIView):
+    authentication_classes = []
+    permission_classes = []
     serializer_class = EmployeeSubTrainingSerializer
     lookup_url_kwarg = 'subtraining_id'
 
@@ -115,6 +124,8 @@ class EmployeeSubTrainingDeleteView(generics.DestroyAPIView):
 
 
 class EmployeeSubTrainingRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    authentication_classes = []
+    permission_classes = []
     queryset = EmployeeSubTraining.objects.all()
     serializer_class = EmployeeSubTrainingSerializer
 
@@ -129,12 +140,6 @@ class EmployeeDetailView(generics.RetrieveAPIView):
 class CompanyListView(generics.ListAPIView):
     queryset = Company.objects.all()
     serializer_class = CompanySerializer
-
-# # List all main trainings
-# class MainTrainingListView(generics.ListAPIView):
-#     queryset = MainTraining.objects.all()
-#     serializer_class = MainTrainingSerializer
-
 
 
 class MainTrainingsListView(generics.ListAPIView):
@@ -151,10 +156,7 @@ class MainTrainingWithSubTrainingsListView(generics.ListAPIView):
         kwargs['context'] = self.get_serializer_context()
         return serializer_class(*args, **kwargs, many=True)
 
-# List all employee sub-trainings
-class EmployeeSubTrainingListCreateView(generics.ListCreateAPIView):
-    queryset = EmployeeSubTraining.objects.all()
-    serializer_class = EmployeeSubTrainingSerializer
+
 
 class AverageCompletionPercentageView(APIView):
     def get(self, request, employee_id):
@@ -378,3 +380,47 @@ class NotificationListView(generics.ListAPIView):
 class NotificationDetailView(generics.RetrieveDestroyAPIView):
     queryset = Notification.objects.all()
     serializer_class = NotificationSerializer
+
+
+
+class EmployeeSubTrainingUploadView(generics.CreateAPIView):
+    authentication_classes = []
+    permission_classes = []
+    queryset = EmployeeSubTraining.objects.all()
+    serializer_class = EmployeeSubTrainingSerializer
+    parser_classes = (MultiPartParser, FormParser)
+
+class EmployeeSubTrainingUpdateView(generics.UpdateAPIView):
+    authentication_classes = []
+    permission_classes = []
+    queryset = EmployeeSubTraining.objects.all()
+    serializer_class = EmployeeSubTrainingSerializer
+    parser_classes = (MultiPartParser, FormParser)
+
+class SubTrainingListByMainTrainingView(generics.ListAPIView):
+    serializer_class = SubTrainingSerializer
+
+    def get_queryset(self):
+        main_training_id = self.kwargs['main_training_id']
+        return SubTraining.objects.filter(main_training_id=main_training_id)
+    
+class URLListView(APIView):
+
+    def get(self, request, *args, **kwargs):
+        url_patterns = get_resolver().url_patterns
+        data = []
+
+        def parse_patterns(patterns, parent_pattern=''):
+            for pattern in patterns:
+                if hasattr(pattern, 'url_patterns'):
+                    parse_patterns(pattern.url_patterns, parent_pattern + str(pattern.pattern))
+                else:
+                    data.append({
+                        'name': pattern.name,
+                        'pattern': parent_pattern + str(pattern.pattern)
+                    })
+
+        parse_patterns(url_patterns)
+        serializer = URLSerializer(data=data, many=True)
+        serializer.is_valid()  # To initialize and format the data
+        return Response(serializer.data)

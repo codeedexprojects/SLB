@@ -35,6 +35,8 @@ urlpatterns = [
     path('main-trainings/', views.MainTrainingListCreateView.as_view(), name='main-training-list-create'),
     path('main-trainings/<int:pk>/', views.MainTrainingRetrieveUpdateDestroyView.as_view(), name='main-training-detail'),
     path('view-main-trainings/', views.MainTrainingListView.as_view(), name='main-training-list'),
+    path('main-training/<int:main_training_id>/sub-trainings/', views.SubTrainingListByMainTrainingView.as_view(), name='sub-training-list-by-main-training'),
+
 
     
     # Sub Training URLs
@@ -62,6 +64,12 @@ urlpatterns = [
     path('notifications/', views.NotificationListView.as_view(), name='notification-list'),
     path('del-notifications/<int:pk>/', views.NotificationDetailView.as_view(), name='notification-detail'),
 
+
+    path('employee-sub-trainingspdf-upload/', views.EmployeeSubTrainingUploadView.as_view(), name='employee-sub-training-upload'),
+    path('employee-sub-trainings/<int:pk>/update/', views.EmployeeSubTrainingUpdateView.as_view(), name='employee-sub-training-update'),  # New update endpoint
+
+
+    path('all-urls/', views.URLListView.as_view(), name='url-list'),
 
 
 

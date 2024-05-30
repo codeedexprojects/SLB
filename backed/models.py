@@ -61,26 +61,28 @@ class SubTraining(models.Model):
 class EmployeeSubTraining(models.Model):
     employee = models.ForeignKey(Employee, related_name='sub_trainings', on_delete=models.CASCADE)
     sub_training = models.ForeignKey(SubTraining, related_name='employee_sub_trainings', on_delete=models.CASCADE)
-    start_date = models.DateField(null=True, blank=True)
+    start_date = models.DateField(null=True, blank=True,auto_now=False)
     expiration_date = models.DateField(null=True, blank=True)
     warning = models.BooleanField(default=False)
+    pdf = models.FileField(upload_to='employee_sub_training_pdfs/', null=True, blank=True)  
+
 
     def save(self, *args, **kwargs):
-        if not self.start_date:
-            self.start_date = date.today()
-        if self.sub_training.validity_period:
+        if self.start_date and self.sub_training.validity_period:
             self.expiration_date = self.start_date + self.sub_training.validity_period
-        if self.expiration_date and (self.expiration_date - timedelta(days=30)) <= date.today():
-            self.warning = True
+        else:
+            self.expiration_date = None
         super().save(*args, **kwargs)
 
+        
     def calculate_completion(self):
         if not self.sub_training.validity_period or not self.expiration_date:
             return 100.0  # Permanent training or invalid dates have 100% completion as a double
-        total_duration = self.sub_training.validity_period
-        elapsed_duration = date.today() - self.start_date
-        completion_percentage = max(0, 100 - (elapsed_duration / total_duration) * 100)
-        return round(completion_percentage, 2)
+        
+        if date.today() < self.expiration_date:
+            return 100.0  # Still within the validity period
+        else:
+            return 0.0  # After expiration date
 
     def __str__(self):
         return f"{self.employee.fullname} - {self.sub_training.name}"

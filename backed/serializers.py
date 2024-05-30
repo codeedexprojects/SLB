@@ -3,6 +3,7 @@ from .models import Company, Employee,MainTraining, SubTraining,EmployeeSubTrain
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from datetime import timedelta, date
+from rest_framework import generics
 
 from .fields import CustomDateField
 
@@ -50,7 +51,7 @@ class SubTrainingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SubTraining
-        fields = ['main_training', 'name', 'validity_period']
+        fields = ['id','main_training', 'name', 'validity_period']
 
     def create(self, validated_data):
         validity_period_str = validated_data.pop('validity_period')
@@ -100,66 +101,91 @@ class MainTrainingSerializer(serializers.ModelSerializer):
         model = MainTraining
         fields = '__all__'
 
+class SubTrainingCreateUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SubTraining
+        fields = ['id', 'name', 'validity_period']
+
 class MainTrainingCreateUpdateSerializer(serializers.ModelSerializer):
-    # sub_trainings = SubTrainingSerializer(many=True)
+    sub_trainings = SubTrainingCreateUpdateSerializer(many=True, required=False)
 
     class Meta:
         model = MainTraining
-        fields = ['id', 'name']
-
-    # def create(self, validated_data):
-    #     # sub_trainings_data = validated_data.pop('sub_trainings')
-    #     main_training = MainTraining.objects.create(**validated_data)
-    #     # for sub_training_data in sub_trainings_data:
-    #     #     SubTraining.objects.create(main_training=main_training, **sub_training_data)
-    #     # return main_training
+        fields = ['id', 'name', 'sub_trainings']
 
     def update(self, instance, validated_data):
-        sub_trainings_data = validated_data.pop('sub_trainings')
+        # Update MainTraining fields
         instance.name = validated_data.get('name', instance.name)
         instance.save()
 
-        # Delete existing sub-trainings and create new ones
-        instance.sub_trainings.all().delete()
-        for sub_training_data in sub_trainings_data:
-            SubTraining.objects.create(main_training=instance, **sub_training_data)
+        # Update SubTrainings if provided
+        if 'sub_trainings' in validated_data:
+            sub_trainings_data = validated_data.pop('sub_trainings')
+
+            # Delete old sub trainings not in the update
+            existing_ids = [sub.id for sub in instance.sub_trainings.all()]
+            new_ids = [sub_data.get('id') for sub_data in sub_trainings_data if 'id' in sub_data]
+            for id in existing_ids:
+                if id not in new_ids:
+                    SubTraining.objects.filter(id=id).delete()
+
+            for sub_data in sub_trainings_data:
+                if 'id' in sub_data:
+                    sub_instance = SubTraining.objects.get(id=sub_data['id'], main_training=instance)
+                    sub_instance.name = sub_data.get('name', sub_instance.name)
+                    sub_instance.validity_period = sub_data.get('validity_period', sub_instance.validity_period)
+                    sub_instance.save()
+                else:
+                    SubTraining.objects.create(main_training=instance, **sub_data)
 
         return instance
+
     
 
+class CustomDateField(serializers.DateField):
+    def __init__(self, *args, **kwargs):
+        kwargs['input_formats'] = ['%d-%m-%Y']
+        super().__init__(*args, **kwargs)
+
 class EmployeeSubTrainingSerializer(serializers.ModelSerializer):
-    start_date = CustomDateField(required=False)
-    expiration_date = CustomDateField(required=False)  # expiration_date might not always be set
+    start_date = serializers.DateField(required=False, format="%d-%m-%Y")
+    expiration_date = serializers.DateField(required=False, format="%d-%m-%Y")
+    completion_percentage = serializers.SerializerMethodField()
+    pdf = serializers.FileField(required=False)
 
     class Meta:
         model = EmployeeSubTraining
-        fields = ['employee', 'sub_training', 'start_date', 'expiration_date', 'warning']
+        fields = ['employee', 'sub_training', 'start_date', 'expiration_date', 'warning', 'completion_percentage', 'pdf']
 
     def validate(self, attrs):
-        # Set default value for start_date if not provided
         if 'start_date' not in attrs or attrs['start_date'] is None:
-            attrs['start_date'] = date.today()
+            attrs['start_date'] = None
         return attrs
 
     def create(self, validated_data):
+        start_date = validated_data.get('start_date')
         sub_training = validated_data['sub_training']
-        start_date = validated_data['start_date']
-        expiration_date = None
+        
+        if start_date:
+            if sub_training.validity_period:
+                expiration_date = start_date + sub_training.validity_period
+            else:
+                expiration_date = None
+            validated_data['expiration_date'] = expiration_date
+        else:
+            validated_data['start_date'] = None
+            validated_data['expiration_date'] = None
 
-        if sub_training.validity_period:
-            expiration_date = start_date + sub_training.validity_period
+        return super().create(validated_data)
 
-        validated_data['expiration_date'] = expiration_date
+    def get_completion_percentage(self, obj):
+        if not obj.expiration_date or not obj.start_date:
+            return 100.0
+        if date.today() < obj.expiration_date:
+            return 100.0
+        return 0.0
 
-        # Create the EmployeeSubTraining instance
-        employee_sub_training = EmployeeSubTraining.objects.create(**validated_data)
 
-        # Check and set the warning flag
-        if expiration_date and (expiration_date - timedelta(days=30)) <= date.today():
-            employee_sub_training.warning = True
-            employee_sub_training.save()
-
-        return employee_sub_training
     
 class AverageCompletionPercentageSerializer(serializers.Serializer):
     employee_id = serializers.IntegerField()
@@ -224,13 +250,33 @@ class EmployeeMainTrainingSerializer(serializers.ModelSerializer):
     main_training_name = serializers.CharField(source='sub_training.main_training.name', read_only=True)
     employee_name = serializers.CharField(source='employee.fullname', read_only=True)
     completion_percentage = serializers.SerializerMethodField()
+    start_percentage = serializers.SerializerMethodField()
+    end_percentage = serializers.SerializerMethodField()
+    start_date = serializers.SerializerMethodField()
+    expiration_date = serializers.SerializerMethodField()
 
     class Meta:
         model = EmployeeSubTraining
-        fields = ['employee_name', 'main_training_name', 'sub_training_name', 'start_date', 'expiration_date', 'warning', 'completion_percentage']
+        fields = [
+            'employee_name', 'main_training_name', 'sub_training_name', 
+            'start_date', 'expiration_date', 'warning', 
+            'completion_percentage', 'start_percentage', 'end_percentage'
+        ]
 
     def get_completion_percentage(self, obj):
         return obj.calculate_completion()
+
+    def get_start_percentage(self, obj):
+        return 100
+
+    def get_end_percentage(self, obj):
+        return 0
+
+    def get_start_date(self, obj):
+        return obj.start_date.strftime("%d/%m/%Y") if obj.start_date else None
+
+    def get_expiration_date(self, obj):
+        return obj.expiration_date.strftime("%d/%m/%Y") if obj.expiration_date else None
     
 class MainTrainingsSerializer(serializers.ModelSerializer):
     sub_trainings = SubTrainingSerializer(many=True, read_only=True)
@@ -238,6 +284,8 @@ class MainTrainingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = MainTraining
         fields = ['id', 'name', 'sub_trainings']
+
+
 
 class SubTrainingWithMainNameSerializer(serializers.ModelSerializer):
     main_training_name = serializers.CharField(source='main_training.name', read_only=True)
@@ -298,3 +346,8 @@ class NotificationSerializer(serializers.ModelSerializer):
 class AveragePercentageSerializer(serializers.Serializer):
     main_training_name = serializers.CharField()
     average_percentage = serializers.FloatField()
+
+
+class URLSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    pattern = serializers.CharField()
