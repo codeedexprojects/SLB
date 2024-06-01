@@ -36,6 +36,8 @@ VALIDITY_CHOICES = [
     (timedelta(days=365), '1 year'),
     (timedelta(days=730), '2 years'),
     (timedelta(days=1095), '3 years'),
+    (timedelta(days=1460), '4 years'),
+    (timedelta(days=1825), '5 years'),
     (None, 'Permanent')
 ]
 
@@ -53,6 +55,8 @@ class SubTraining(models.Model):
         (timedelta(days=365), '1 year'),
         (timedelta(days=365 * 2), '2 years'),
         (timedelta(days=365 * 3), '3 years'),
+        (timedelta(days=365 * 4), '4 years'),
+        (timedelta(days=365 * 5), '5 years'),
         (None, 'Permanent')
     ]
     validity_period = models.DurationField(choices=VALIDITY_CHOICES, null=True, blank=True)
@@ -65,6 +69,8 @@ class EmployeeSubTraining(models.Model):
     expiration_date = models.DateField(null=True, blank=True)
     warning = models.BooleanField(default=False)
     pdf = models.FileField(upload_to='employee_sub_training_pdfs/', null=True, blank=True)  
+    verify_pdf = models.BooleanField(null=True, default=None)
+
 
 
     def save(self, *args, **kwargs):

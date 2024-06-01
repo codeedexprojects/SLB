@@ -29,6 +29,12 @@ class EmployeeSerializer(serializers.ModelSerializer):
             'id', 'fullname', 'mobile_number', 'designation', 'gate_pass_no',
             'rig_or_rigless', 'company_id', 'project_id', 'profile_photo', 'is_accepted','company','project','on_duty'
         ]
+    
+    def get_profile_photo(self, obj):
+        request = self.context.get('request')
+        if obj.profile_photo:
+            return request.build_absolute_uri(obj.profile_photo.url)
+        return None
 
 class EmployeePhotoSerializer(serializers.ModelSerializer):
     class Meta:
@@ -44,6 +50,8 @@ class SubTrainingSerializer(serializers.ModelSerializer):
         '1 year': timedelta(days=365),
         '2 years': timedelta(days=365 * 2),
         '3 years': timedelta(days=365 * 3),
+        '4 years': timedelta(days=365 * 4),
+        '5 years': timedelta(days=365 * 5),
         'Permanent': None,
     }
 
@@ -152,10 +160,13 @@ class EmployeeSubTrainingSerializer(serializers.ModelSerializer):
     expiration_date = serializers.DateField(required=False, format="%d-%m-%Y")
     completion_percentage = serializers.SerializerMethodField()
     pdf = serializers.FileField(required=False)
+    sub_training_name = serializers.SerializerMethodField()
+    main_training_name = serializers.SerializerMethodField()
+
 
     class Meta:
         model = EmployeeSubTraining
-        fields = ['employee', 'sub_training', 'start_date', 'expiration_date', 'warning', 'completion_percentage', 'pdf']
+        fields = ['employee', 'sub_training', 'sub_training_name','main_training_name', 'start_date', 'expiration_date', 'warning', 'completion_percentage', 'pdf','verify_pdf']
 
     def validate(self, attrs):
         if 'start_date' not in attrs or attrs['start_date'] is None:
@@ -184,6 +195,12 @@ class EmployeeSubTrainingSerializer(serializers.ModelSerializer):
         if date.today() < obj.expiration_date:
             return 100.0
         return 0.0
+    
+    def get_sub_training_name(self, obj):
+        return obj.sub_training.name
+    
+    def get_main_training_name(self, obj):
+        return obj.sub_training.main_training.name
 
 
     
@@ -254,13 +271,18 @@ class EmployeeMainTrainingSerializer(serializers.ModelSerializer):
     end_percentage = serializers.SerializerMethodField()
     start_date = serializers.SerializerMethodField()
     expiration_date = serializers.SerializerMethodField()
+    sub_training_id = serializers.IntegerField(source='sub_training.id', read_only=True)
+    employee_sub_training_id = serializers.IntegerField(source='id', read_only=True)
+    pdf = serializers.FileField(required=False)
+    verify_pdf = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = EmployeeSubTraining
         fields = [
-            'employee_name', 'main_training_name', 'sub_training_name', 
-            'start_date', 'expiration_date', 'warning', 
-            'completion_percentage', 'start_percentage', 'end_percentage'
+            'employee_name', 'main_training_name', 'sub_training_name',
+            'start_date', 'expiration_date', 'warning',
+            'completion_percentage', 'start_percentage', 'end_percentage',
+            'pdf', 'sub_training_id', 'employee_sub_training_id','verify_pdf'
         ]
 
     def get_completion_percentage(self, obj):
@@ -277,6 +299,7 @@ class EmployeeMainTrainingSerializer(serializers.ModelSerializer):
 
     def get_expiration_date(self, obj):
         return obj.expiration_date.strftime("%d/%m/%Y") if obj.expiration_date else None
+
     
 class MainTrainingsSerializer(serializers.ModelSerializer):
     sub_trainings = SubTrainingSerializer(many=True, read_only=True)
@@ -295,6 +318,8 @@ class SubTrainingWithMainNameSerializer(serializers.ModelSerializer):
         '1 year': timedelta(days=365),
         '2 years': timedelta(days=365 * 2),
         '3 years': timedelta(days=365 * 3),
+        '4 years': timedelta(days=365 * 4),
+        '5 years': timedelta(days=365 * 5),
         'Permanent': None,
     }
 
@@ -351,3 +376,10 @@ class AveragePercentageSerializer(serializers.Serializer):
 class URLSerializer(serializers.Serializer):
     name = serializers.CharField()
     pattern = serializers.CharField()
+
+class EmployeeSubTrainingPDFUpdateSerializer(serializers.ModelSerializer):
+    pdf = serializers.FileField(required=True)
+
+    class Meta:
+        model = EmployeeSubTraining
+        fields = ['pdf']    

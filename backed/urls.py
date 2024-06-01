@@ -1,7 +1,8 @@
 from django.urls import path
 from backed import views
 from .views import EmployeeLoginView
-
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
     # Company URLs
@@ -28,7 +29,8 @@ urlpatterns = [
     path('employees/<int:employee_id>/average-completion-percentage/', views.AverageCompletionPercentageView.as_view(), name='average-completion-percentage'),
     path('employee/<int:employee_id>/main-training/<int:main_training_id>/average/', views.EmployeeMainTrainingAverageView.as_view(), name='employee-main-training-average'),
 
-    
+    path('employee-sub-training/<int:pk>/verify-pdf/', views.VerifyPDFView.as_view(), name='verify-pdf'),
+
     
 
      # Main Training URLs
@@ -68,6 +70,10 @@ urlpatterns = [
     path('employee-sub-trainingspdf-upload/', views.EmployeeSubTrainingUploadView.as_view(), name='employee-sub-training-upload'),
     path('employee-sub-trainings/<int:pk>/update/', views.EmployeeSubTrainingUpdateView.as_view(), name='employee-sub-training-update'),  # New update endpoint
 
+    path('employees/<int:employee_id>/sub-trainings/', views.EmployeesSubTrainingListView.as_view(), name='employee-sub-training-list'),
+    path('employee/<int:employee_id>/subtraining/<int:sub_training_id>/pdf/', views.EmployeeSubTrainingPDFView.as_view(), name='employee-subtraining-pdf'),
+    path('employee-sub-trainings/<int:pk>/update-pdf/', views.EmployeeSubTrainingPDFUpdateView.as_view(), name='employee-sub-training-update-pdf'),
+
 
     path('all-urls/', views.URLListView.as_view(), name='url-list'),
 
@@ -75,3 +81,10 @@ urlpatterns = [
 
 
 ]
+
+
+
+
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

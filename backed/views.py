@@ -8,13 +8,14 @@ from .models import Company, Employee,MainTraining, SubTraining,EmployeeSubTrain
 from .serializers import CompanySerializer, EmployeeSerializer, EmployeePhotoSerializer,MainTrainingCreateUpdateSerializer,MainTrainingSerializer,SubTrainingSerializer\
 ,EmployeeSubTrainingSerializer,AdminLoginSerializer,ProjectsSerializer,AcceptRejectEmployeeSerializer,OnDutyOffDutyToggleSerializer,EmployeePercentageSubTrainingSerializer\
 ,MainTrainingsSerializer,SubTrainingWithMainNameSerializer,MainTrainingWithSubSerializer,EmployeeSearchSerializer,EmployeeMainTrainingSerializer,NotificationSerializer\
-,AverageCompletionPercentageSerializer,AveragePercentageSerializer,SubTrainingUpdateSerializer,URLSerializer
+,AverageCompletionPercentageSerializer,AveragePercentageSerializer,SubTrainingUpdateSerializer,URLSerializer,EmployeeSubTrainingPDFUpdateSerializer
 from rest_framework.views import APIView
 from django.contrib.auth import login
 from .filters import EmployeeFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.urls import get_resolver
+from rest_framework.permissions import IsAdminUser
 
 
 # Company Views
@@ -424,3 +425,58 @@ class URLListView(APIView):
         serializer = URLSerializer(data=data, many=True)
         serializer.is_valid()  # To initialize and format the data
         return Response(serializer.data)
+
+
+
+class EmployeesSubTrainingListView(generics.ListAPIView):
+    serializer_class = EmployeeSubTrainingSerializer
+
+    def get_queryset(self):
+        employee_id = self.kwargs['employee_id']
+        return EmployeeSubTraining.objects.filter(employee_id=employee_id)
+    
+from django.http import HttpResponse, Http404
+
+
+class EmployeeSubTrainingPDFView(APIView):
+
+    def get(self, request, employee_id, sub_training_id, format=None):
+        try:
+            sub_training = EmployeeSubTraining.objects.get(employee_id=employee_id, sub_training_id=sub_training_id)
+        except EmployeeSubTraining.DoesNotExist:
+            raise Http404
+
+        if not sub_training.pdf:
+            raise Http404
+
+        response = HttpResponse(sub_training.pdf, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{sub_training.pdf.name}"'
+        return response
+    
+from rest_framework.generics import UpdateAPIView
+
+
+class EmployeeSubTrainingPDFUpdateView(generics.UpdateAPIView):
+    queryset = EmployeeSubTraining.objects.all()
+    serializer_class = EmployeeSubTrainingPDFUpdateSerializer
+    authentication_classes = []
+    permission_classes = []
+
+    def patch(self, request, *args, **kwargs):
+        return self.partial_update(request, *args, **kwargs)
+    
+class VerifyPDFView(generics.UpdateAPIView):
+    queryset = EmployeeSubTraining.objects.all()
+    serializer_class = EmployeeSubTrainingSerializer
+    authentication_classes = []
+    permission_classes = []
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        verify_pdf = request.data.get('verify_pdf')
+
+        if verify_pdf is not None:
+            instance.verify_pdf = verify_pdf
+            instance.save()
+            return Response({'status': 'PDF verification updated'}, status=status.HTTP_200_OK)
+        return Response({'error': 'Invalid request'}, status=status.HTTP_400_BAD_REQUEST)
